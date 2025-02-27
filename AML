@@ -1,0 +1,63 @@
+import pandas as pd
+from pgmpy.models import BayesianNetwork
+from pgmpy.factors.discrete import TabularCPD
+from pgmpy.inference import VariableElimination
+
+# Define the structure of the Bayesian Network
+# Example: Modeling network security with parameters like Traffic, Logins, and DataTransfer
+model = BayesianNetwork([
+    ('LoginAttempts', 'Anomaly'),
+    ('TrafficVolume', 'Anomaly'),
+    ('DataTransfer', 'Anomaly'),
+    ('ExternalAccess', 'Anomaly')
+])
+
+# Define Conditional Probability Distributions (CPDs)
+cpd_login = TabularCPD(variable='LoginAttempts', variable_card=2, 
+                       values=[[0.8], [0.2]], 
+                       state_names={'LoginAttempts': ['Normal', 'High']})
+
+cpd_traffic = TabularCPD(variable='TrafficVolume', variable_card=2, 
+                         values=[[0.7], [0.3]], 
+                         state_names={'TrafficVolume': ['Normal', 'High']})
+
+cpd_data_transfer = TabularCPD(variable='DataTransfer', variable_card=2, 
+                               values=[[0.9], [0.1]], 
+                               state_names={'DataTransfer': ['Normal', 'High']})
+
+cpd_external_access = TabularCPD(variable='ExternalAccess', variable_card=2, 
+                                 values=[[0.85], [0.15]], 
+                                 state_names={'ExternalAccess': ['Normal', 'High']})
+
+cpd_anomaly = TabularCPD(variable='Anomaly', variable_card=2, 
+                         values=[
+                             [0.95, 0.7, 0.8, 0.6, 0.7, 0.5, 0.6, 0.2],  # No Anomaly
+                             [0.05, 0.3, 0.2, 0.4, 0.3, 0.5, 0.4, 0.8]   # Anomaly
+                         ], 
+                         evidence=['LoginAttempts', 'TrafficVolume', 'DataTransfer', 'ExternalAccess'],
+                         evidence_card=[2, 2, 2, 2],
+                         state_names={
+                             'LoginAttempts': ['Normal', 'High'],
+                             'TrafficVolume': ['Normal', 'High'],
+                             'DataTransfer': ['Normal', 'High'],
+                             'ExternalAccess': ['Normal', 'High'],
+                             'Anomaly': ['No', 'Yes']
+                         })
+
+# Add CPDs to the model
+model.add_cpds(cpd_login, cpd_traffic, cpd_data_transfer, cpd_external_access, cpd_anomaly)
+
+# Check if the model is valid
+assert model.check_model()
+
+# Perform inference
+inference = VariableElimination(model)
+
+# Predict the likelihood of an anomaly under specific network conditions
+result = inference.query(variables=['Anomaly'], 
+                         evidence={'LoginAttempts': 'High', 
+                                   'TrafficVolume': 'High', 
+                                   'DataTransfer': 'Normal', 
+                                   'ExternalAccess': 'High'})
+
+print(result)
